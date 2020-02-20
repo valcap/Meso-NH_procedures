@@ -1,0 +1,24 @@
+#!/bin/bash
+
+# Check env file
+envfile=../pie2500m.env
+if [ ! -e $envfile ]; then
+  echo "ops $envfile is missing!"
+  exit 1;
+else
+  source $envfile
+fi
+
+rm -f PRE_PGD1.nam
+rm -f plt_BasicMap.png
+rm -f CLAY_HWSD_MOY.dir  ECOCLIMAP_II_EUROP_V2.3.dir  gtopo30.dir  SAND_HWSD_MOY.dir  srtm_ne_250.dir
+rm -f CLAY_HWSD_MOY.hdr  ECOCLIMAP_II_EUROP_V2.3.hdr  gtopo30.hdr  SAND_HWSD_MOY.hdr  srtm_ne_250.hdr
+rm -f PRE_REAL1.nam* pipe_name file_for_xtransfer OUTPUT_LISTING* SPAWN1.nam* R_* -f
+rm -f *.des *.lfi OUTPUT_LISTING* EXSEG* pipe_name *.out readme_config -f
+rm -f ${PREFIX}_PGD_${RES}.{des,lfi,nc}
+rm -f *.dat PRESSURE REMAP* -f
+rm -f FLO*
+rm -f OUT_DIA FIC* FICJD
+rm -f OUT_DIA LISTING_DIA 
+rm -f dom0*-0.png dom0*-0.ps dom0*-0.eps
+

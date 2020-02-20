@@ -1,0 +1,152 @@
+#! /bin/bash
+
+# Check env file
+envfile=../pie2500m.env
+if [ ! -e $envfile ]; then
+  echo "ops $envfile is missing!"
+  exit 1;
+else
+  source $envfile
+fi
+
+# Clear previous run
+rm -f tmp.extractdia
+for DOM in `seq 1 $NDOM`; do
+  for ext in lfi des; do
+    echo rm -f ./d.${NAM_SIMU}.${DOM}.${NAM_SEG}.*_dg.${ext}
+  done
+done
+
+# Link diagnostic _dg files
+for DOM in `seq 1 $NDOM`; do
+  for ext in lfi des; do
+    for diag_file in `ls ../005_conv2dia/d.${NAM_SIMU}.${DOM}.${NAM_SEG}.*_dg.${ext}`; do
+      ln -svf $diag_file .
+    done
+  done
+done
+
+# Run extractdia to obtain GriB files
+for DOM in `seq 1 $NDOM`
+do
+  for ggg in `ls ./d.${NAM_SIMU}.${DOM}.${NAM_SEG}.*_dg.lfi | grep -v "000"`
+  do
+    basefile_dg=`basename $ggg .lfi`
+##############################################################
+    # ACPRR (if LUSERR=T) Accumulated explicit Precipitation Rate for Rain (mm)
+##############################################################
+cat << EOF > ./tmp.extractdia
+${basefile_dg}
+PGRB
+  0
+-1.0000000
+-1.0000000
+-1.0000000
+-1.0000000
+  n
+  0
+  0
+  0
+  0
+  0
+  0
+  1
+500.00000
+LALO
+ACTOPR 61
+END
+EOF
+#ACPRR 61
+    extractdia < tmp.extractdia
+# > /dev/null
+    if [ $? -ne 0 ]; then
+      echo "extractdia ${basefile_dg} KO"; exit 1;
+    else
+      grbfilename=`basename $ggg .lfi`.GRB
+      newfilename=`basename $ggg _dg.lfi`_acprr.grb
+      mv $grbfilename $newfilename
+      rm -f tmp.diaprog
+    fi
+##############################################################
+    # UT10 33 10 VT10 34 10 
+    # UM10 VM10: [2D] components of wind at 10m (m/s)
+    # FF10MAX: [2D] Wind gusts at 10 m (only if CTURB=’TKEL’)
+##############################################################
+cat << EOF > ./tmp.extractdia
+${basefile_dg}
+PGRB
+  0
+-1.0000000
+-1.0000000
+-1.0000000
+-1.0000000
+  n
+  0
+  0
+  0
+  0
+  0
+  0
+  1
+500.00000
+LALO
+UM10 33 10
+VM10 34 10
+FF10MAX 180 10
+END
+EOF
+    extractdia < tmp.extractdia > /dev/null
+    if [ $? -ne 0 ]; then
+      echo "extractdia ${basefile_dg} KO"; exit 1;
+    else
+      grbfilename=`basename $ggg .lfi`.GRB
+      newfilename=`basename $ggg _dg.lfi`_wnd10m.grb
+      mv $grbfilename $newfilename
+      rm -f tmp.diaprog
+    fi
+##############################################################
+    # T2M 11 2
+##############################################################
+cat << EOF > ./tmp.extractdia
+${basefile_dg}
+PGRB
+  0
+-1.0000000
+-1.0000000
+-1.0000000
+-1.0000000
+  n
+  0
+  0
+  0
+  0
+  0
+  0
+  1
+500.00000
+LALO
+T2M 11 2
+END
+EOF
+    extractdia < tmp.extractdia > /dev/null
+    if [ $? -ne 0 ]; then
+      echo "extractdia ${basefile_dg} KO"; exit 1;
+    else
+      grbfilename=`basename $ggg .lfi`.GRB
+      newfilename=`basename $ggg _dg.lfi`_tmp2m.grb
+      mv $grbfilename $newfilename
+      rm -f tmp.diaprog
+    fi
+  done
+done
+
+# Remove unnecessary files
+rm -f tmp.extractdia dirextract* OUT_DIA
+for DOM in `seq 1 $NDOM`; do
+  for ext in lfi des; do
+    rm -f ./d.${NAM_SIMU}.${DOM}.${NAM_SEG}.*_dg.${ext}
+  done
+done
+
+exit 0;
+

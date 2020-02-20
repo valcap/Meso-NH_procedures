@@ -1,0 +1,42 @@
+
+! Open and inspect variables therein
+_file_'INFILE'
+print groups
+
+! Gestion de la fenêtre d’affichage
+LVPTUSER=T
+!XVPTL=0.1,XVPTR=0.8,XVPTB=0.1,XVPTU=0.9
+
+! Zoom
+!NIINF=50, NISUP=150, NJINF=50, NJSUP=150
+
+!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+XLATCAR=45.1340,9999.
+XLONCAR=8.5051,9999.
+XSZSYM=0.008,9999.
+ICOLSYM=1,9999.
+CSYMCAR='.'
+XSZNOM=0.012,9999.
+CNOMCAR='CASALE_MONFERRATO'
+!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+
+!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+! analogo a set gxout shaded
+lcolarea=t
+! analogo a set gxout contour
+liso=F
+! PRIMA opzione per la selezione dei clevs
+! NIMNMX=1
+! xisomin_FF10MAX=0 xisomax_FF10MAX=32.5 xdiaint_FF10MAX=5.
+! SECONDA opzione per la selezione dei clevs
+NIMNMX=2
+XISOLEV_FF10MAX=0.5,1.5,3.,5.,8.,11.,14.,17.,20.,24.,28.,32.5,9999.
+LCOLAREASEL=T
+LTABCOLDEF=F
+FF10MAX
+colori_wind
+13
+2 3 4 5 6 7 8 9 10 11 12 13 14
+
+quit
+

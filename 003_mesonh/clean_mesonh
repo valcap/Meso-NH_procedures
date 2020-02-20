@@ -1,0 +1,23 @@
+#!/bin/bash
+
+# Check env file
+envfile=../pie2500m.env
+if [ ! -e $envfile ]; then
+  echo "ops $envfile is missing!"
+  exit 1;
+else
+  source $envfile
+fi
+
+rm -fv my_hosts
+rm -fv fort.0
+rm -fv nohup.out
+rm -fv ${NAM_SIMU}_${NAM_SEG}.out
+rm -fv ${PREFIX}*PGD*KM*.{lfi,des,nc}
+rm -fv ${PREFIX}.1.${NAM_SIMU}.0*.{lfi,des,nc}
+rm -fv ${NAM_SIMU}.*.${NAM_SEG}.*.des ${NAM_SIMU}.*.${NAM_SEG}.*.lfi ${NAM_SIMU}.*.${NAM_SEG}.*.nc
+rm -fv ${PREFIX}_*KM.*.*.{lfi,des,nc}
+rm -fv ${PREFIX}_PGD_*KM.*.{lfi,des,nc}
+rm -fv readme_config PRESSURE pipe_name file_for_xtransfer REMAP_*
+rm -fv EXSEG*.nam* SURF*.nam*
+rm -fv OUTPUT_LISTING*

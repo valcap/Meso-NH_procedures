@@ -1,0 +1,25 @@
+#!/bin/bash
+
+# Check env file
+envfile=../pie2500m.env
+if [ ! -e $envfile ]; then
+  echo "ops $envfile is missing!"
+  exit 1;
+else
+  source $envfile
+fi
+
+echo "Cleaning previous session and auxiliary files"
+rm -f temp.ctl
+for DOM in `seq 1 $NDOM`; do
+  for var in tmp2m acprr wnd10m
+  do 
+    for grib_file in `ls ./d.${NAM_SIMU}.${DOM}.${NAM_SEG}.*_${var}.grb`
+    do
+      rm -f $grib_file
+      rm -f $grib_file.{ctl,idx}
+    done
+  done
+done
+
+exit 0;

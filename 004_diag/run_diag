@@ -1,0 +1,88 @@
+#!/bin/sh
+
+# Check env file
+envfile=../pie2500m.env
+if [ ! -e $envfile ]; then
+  echo "ops $envfile is missing!"
+  exit 1;
+else
+  source $envfile
+fi
+
+# Clear previous run
+./clean_diag
+
+# Link PGD FILES
+if [ -e ../001_pgd/${fpgd}.lfi ]; then
+  for ext in des lfi nc
+  do
+    ln -sf ../001_pgd/${fpgd}.${ext} .
+  done
+else
+  echo "ops ../001_pgd/${fpgd}.lfi is missing"
+  exit 1
+fi
+
+# Main loop over lfi files
+for DOM in `seq 1 $NDOM`
+do
+  ln -svf ../003_mesonh/${NAM_SIMU}.${DOM}.${NAM_SEG}.*.lfi .
+  ln -svf ../003_mesonh/${NAM_SIMU}.${DOM}.${NAM_SEG}.*.des .
+  rm -f ./${NAM_SIMU}.${DOM}.${NAM_SEG}.000.{des,lfi}
+  for lfi in `ls ${NAM_SIMU}.${DOM}.${NAM_SEG}.*.lfi | grep -v '000'`
+  do
+  basefile=`basename $lfi .lfi`
+  # 7 September 2017 soline.bielli-bousquet@univ-reunion.fr (** see explanations below)
+cat>DIAG1.nam.tmpl<<EOF
+  &NAM_CONFIO      LCDF4=F, 
+                   LLFIOUT=T,
+                   LLFIREAD=T /
+  &NAM_DIAG             
+                   CISO='TKPREV',
+                   LVAR_RS=F, 
+                   NCONV_KF=1, 
+                   LVAR_PR=T,
+                   LTOTAL_PR=${FLAG_TOTAL_PR},
+                   LVAR_MRW=T,
+                   LTPZH=${FLAG_VARS_ON_PRESS_LEV},
+                   LMSLP=T,
+                   NCAPE=1,
+                   LRADAR=F,
+                   LDIAG(:)=.FALSE. /
+  &NAM_DIAG_FILE   YINIFILE(1) = "${basefile}" ,
+                   YINIFILEPGD(1) = "${fpgd}",
+                   YSUFFIX='_dg' /
+  &NAM_DIAG_SURFn  N2M=2 
+                   LSURF_BUDGET=T /
+  &NAM_DIAG_ISBAn  LPGD=F 
+                   LSURF_EVAP_BUDGET=T /
+  &NAM_CONFZ       MPI_BUFFER_SIZE = 500 /
+EOF
+    mv -v DIAG1.nam.tmpl DIAG1.nam
+    time mpirun -n $np_diag $EXE_DIAG >& diag.out
+    if [ $? -eq 0 ]; then
+      rm -f file_for_xtransfer pipe_name DIAG1.nam
+      rm -f ${basefile}.lfi ${basefile}.nc ${basefile}.des
+    else
+      echo "ops problem in DIAG $basefile"
+      exit 1;
+    fi
+  done
+done
+
+exit 0;
+
+###################
+# **
+#To get the accumulated explicit precipitation rate, you need to modify the namelist DIAG1.nam as following:
+#LVAR_PR=F must be LVAR_PR=T
+
+#And you need to add this line:
+#LVAR_MRW=T
+
+#And
+#LSURF_BUDGET=F must be LSURF_BUDGET=T
+#For the wind gust at 10 m, you need to have :
+#CSURF='EXTE' and CTURB='TKEL' 
+###################
+

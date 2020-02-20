@@ -1,0 +1,21 @@
+#!/bin/bash
+#
+
+# Check env file
+envfile=../pie2500m.env
+if [ ! -e $envfile ]; then
+  echo "ops $envfile is missing!"
+  exit 1;
+else
+  source $envfile
+fi
+
+rm -f fort.0
+rm -fv ${PREFIX}_PGD_*KM*.des ${PREFIX}_PGD_*KM*.lfi ${PREFIX}_PGD_*KM*.nc
+rm -fv ${PREFIX}_*KM.*.*.lfi ${PREFIX}_*KM.*.*.des ${PREFIX}_*KM.*.*.nc
+rm PRE_REAL1.nam* PREP_REAL1.nam* pipe_name file_for_xtransfer OUTPUT_LISTING* SPAWN1.nam* R_* -fv
+rm OUTPUT_LISTING* EXSEG* pipe_name *.out readme_config -fv
+rm *.dat PRESSURE REMAP* -fv
+rm -fv for.FC-FC.OD.*
+rm -fv fgfs.f* ./${prefix_global}.t*z.pgrb2.0p25.f*
+

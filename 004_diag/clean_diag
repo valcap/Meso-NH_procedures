@@ -1,0 +1,17 @@
+#!/bin/bash
+
+# Check env file
+envfile=../pie2500m.env
+if [ ! -e $envfile ]; then
+  echo "ops $envfile is missing!"
+  exit 1;
+else
+  source $envfile
+fi
+
+rm -f *_dg.lfi  *_dg.des
+rm -f OUTPUT_LISTING* file_for_xtransfer pipe_name
+rm -f DIAG1.nam diag.out DIAG1.nam.tmpl DIAG
+rm -f ./${NAM_SIMU}.*.${NAM_SEG}.*.{des,lfi,nc}
+rm -f ./${PREFIX}_PGD_*KM*.{des,lfi,nc}
+

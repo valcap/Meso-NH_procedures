@@ -1,0 +1,27 @@
+#!/bin/bash
+
+# Check env file
+envfile=../pie2500m.env
+if [ ! -e $envfile ]; then
+  echo "ops $envfile is missing!"
+  exit 1;
+else
+  source $envfile
+fi
+
+rm -f tmp.extractdia
+
+# Clear previous run
+for DOM in `seq 1 $NDOM`; do
+  for ext in lfi des; do
+    rm -f ./d.${NAM_SIMU}.${DOM}.${NAM_SEG}.*_dg.${ext}
+  done
+done
+
+# Clear previous run
+for DOM in `seq 1 $NDOM`; do
+  for ext in grb GRB idx ctl; do
+    rm -f ./d.${NAM_SIMU}.${DOM}.${NAM_SEG}.*_*.${ext}
+  done
+done
+

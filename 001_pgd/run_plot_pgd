@@ -1,0 +1,99 @@
+#!/bin/bash
+
+# Check env file
+envfile=../pie2500m.env
+if [ ! -e $envfile ]; then
+  echo "ops $envfile is missing!"
+  exit 1;
+else
+  source $envfile
+  rm -f d.*.lfi d01.*
+fi
+
+############################
+# Run conv2dia
+############################
+for ggg in `ls ${PREFIX}_PGD_*.lfi`
+do
+  fff=`basename ${ggg} .lfi`
+  echo conv2dia $fff
+cat << EOF > conv2dia.file
+1
+${fff}
+d.${fff}
+n
+n
+0
+EOF
+  conv2dia < conv2dia.file >& /dev/null
+  if [ $? -ne 0 ]; then
+    echo "conv2dia ${fff} KO"; exit 1;
+  else
+    echo conv2dia OK
+    rm -f conv2dia.file
+  fi
+
+done
+
+############################
+# Run diaprog
+############################
+prog=1
+for ggg in `ls d.${PREFIX}_PGD_*.lfi`
+do
+  fff=`basename ${ggg} .lfi`
+  echo diaprog $fff
+cat << EOF > diaprog.file
+_file_'${fff}'
+LPRINT=T
+
+LCOLAREA=t
+LISO=t
+
+LVPTUSER=T
+XVPTL=0.1,XVPTR=0.8,XVPTB=0.1,XVPTU=0.9
+XLATCAR=44.70,9999.
+XLONCAR=8.00,9999.
+XSZSYM=0.008,9999.
+CSYMCAR='.'
+XSZNOM=0.012,9999.
+CNOMCAR='centro_griglia'
+
+nimnmx=1
+lminmax=t
+xisomin_ZS=0
+xisomax_ZS=2000
+xdiaint_ZS=200
+!xisomax_ZS=2000
+!xdiaint_ZS=200
+!xisomax_ZS=1500
+!xdiaint_ZS=150
+
+ZS_file1_
+quit
+done
+EOF
+  diaprog < diaprog.file >& /dev/null 
+  if [ $? -ne 0 ]; then
+    echo "diaprog ${fff} KO"; exit 1;
+  else
+    echo diaprog OK
+    rm -f diaprog.file
+  fi
+  ctrans -d ps.color gmeta > dom0${prog}.ps 
+  convert dom0${prog}.ps dom0${prog}.png
+  rm -f gmeta FICVAL FICJD LISTING_DIA dirconv OUT_DIA dir.* dom0*.ps dom0*-1.png
+  let "prog = prog + 1"
+done
+
+rm -f d.${PREFIX}_PGD_*${RES}.*
+
+# ncl
+if [ -e plot_ZS.ncl ]; then
+  rm -f plt_BasicMap.png
+  ncl < plot_ZS.ncl
+fi
+
+# exit
+exit 0
+

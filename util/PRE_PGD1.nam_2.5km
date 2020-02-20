@@ -1,0 +1,16 @@
+&NAM_PGDFILE    CPGDFILE='LIV_PGD_2.5KM'                             /
+&NAM_PGD_GRID   CGRID     = 'CONF PROJ '                             /
+&NAM_CONF_PROJ
+                XLAT0=43.535215, XLON0=10.298525,
+                XRPK=1.0, XBETA=0.                                   /
+&NAM_CONF_PROJ_GRID
+                XLATCEN=43.535215, XLONCEN=10.298525,
+                NIMAX=225, NJMAX=225,
+                XDX=2500., XDY=2500.                                 /
+&NAM_COVER      YCOVER='ECOCLIMAP_II_EUROP_V2.3', YFILETYPE='DIRECT' /
+&NAM_ZS         YZS='gtopo30',    YFILETYPE='DIRECT'                 /
+&NAM_ISBA       YCLAY='CLAY_HWSD_MOY', YCLAYFILETYPE='DIRECT',
+                YSAND='SAND_HWSD_MOY', YSANDFILETYPE='DIRECT'        /
+&NAM_SEABATHY   XUNIF_SEABATHY=0                                     /
+&NAM_CONFIO     LCDF4=T, LLFIOUT=T, LLFIREAD=T                       /
+&NAM_CONF_PGD   NHALO_MNH=1                                          /

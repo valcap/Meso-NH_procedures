@@ -1,0 +1,129 @@
+#! /bin/bash
+
+# Check env file
+envfile=../pie2500m.env
+if [ ! -e $envfile ]; then
+  echo "ops $envfile is missing!"
+  exit 1;
+else
+  source $envfile
+  # Clean previous run
+  ./clean_prep_real
+fi
+
+# Link GLOBAL DATA
+count=0
+for tstep in `seq $tstep_ini $tstep_inc $tstep_end`
+do
+  YYYY=`date +%Y --date "$start_date"`
+  MM=`date +%m --date "$start_date"`
+  DD=`date +%d --date "$start_date"`
+  fglobal=${GLOBAL_DATA_DIR}/PIE94_${expID}_all_${YYYY}${MM}${DD}-${tstep}.grib
+  if [ ! -e $fglobal ]; then
+    echo "ops $fglobal is missing..."; exit 1
+  else
+    fhour=`printf %03d $count`
+    ln -svf $fglobal fgfs.f$fhour
+    count=$((count+tstep_inc))
+  fi
+done
+
+# Link PGD FILES
+if [ -e ../001_pgd/${fpgd}.lfi ]; then
+  ln -sf ../001_pgd/${fpgd}.* .
+else
+  echo "ops ../001_pgd/${fpgd}.lfi is missing"
+  exit 1
+fi
+
+# loop over fgfs
+for tstep in `seq $tstep_ini $tstep_inc $tstep_end`
+do
+  fhour=`printf %03d $tstep`
+  fglobal=fgfs.f$fhour
+  curdate=`date +%Y%m%d --date "$start_date $start_hour GMT + $tstep hour"`
+  curhour=`date +%H --date "$start_date $start_hour GMT + $tstep hour"`
+  FILEOUT=${PREFIX}_${RES}.t${curdate}z.f${curhour}00
+  echo $FILEOUT
+cat>PRE_REAL1.nam <<EOF
+&NAM_CONFIO LCDF4=F LLFIREAD=T LLFIOUT=T /
+&NAM_FILE_NAMES HATMFILE='${fglobal}',
+                HATMFILETYPE='GRIBEX',
+                HPGDFILE='${fpgd}',
+                CINIFILE='${FILEOUT}' /
+&NAM_REAL_CONF NVERB=5, CEQNSYS='DUR'  /
+&NAM_READNAM  LNAM_READ=T /
+!&NAM_VER_GRID NKMAX=62, YZGRID_TYPE='FUNCTN', ZDZGRD=5, ZDZTOP=600,
+!              ZZMAX_STRGRD=2000, ZSTRGRD=20, ZSTRTOP=00 /
+&NAM_VER_GRID YZGRID_TYPE='MANUAL', NKMAX=40  /
+ZHAT
+.0000000E+00
+.7213016E+02
+.1504758E+03
+.2378252E+03
+.3367744E+03
+.4497268E+03
+.5788933E+03
+.7262926E+03
+.8937506E+03
+.1082901E+04
+.1295185E+04
+.1531851E+04
+.1793956E+04
+.2082363E+04
+.2397744E+04
+.2740577E+04
+.3111149E+04
+.3509554E+04
+.3935693E+04
+.4389276E+04
+.4869819E+04
+.5376646E+04
+.5908888E+04
+.6465486E+04
+.7045184E+04
+.7646539E+04
+.8269539E+04
+.8914539E+04
+.9582539E+04
+.10275039E+05
+.10992639E+05
+.11736239E+05
+.12506739E+05
+.13305139E+05
+.14132439E+05
+.14989699E+05
+.15877999E+05
+.16798459E+05
+.17752259E+05
+.18740559E+05
+.19764669E+05
+EOF
+#cat>PRE_REAL1.nam <<EOF
+#&NAM_FILE_NAMES HATMFILE='${fglobal}', HATMFILETYPE='GRIBEX',
+#             HPGDFILE='${fpgd}',
+#             CINIFILE='${FILEOUT}' /
+#&NAM_REAL_CONF CEQNSYS='LHE', CPRESOPT='ZRESI', NVERB=10 , NHALO=1 /
+#&NAM_VER_GRID NKMAX=62, YZGRID_TYPE='FUNCTN', ZDZGRD=5, ZDZTOP=600,
+#              ZZMAX_STRGRD=3500, ZSTRGRD=20, ZSTRTOP=00 /
+#&NAM_CONFIO LCDF4=F, LLFIOUT=T, LLFIREAD=T /
+#EOF
+
+  time mpirun -np $np_real ${EXE_REAL}
+  cat OUTPUT_LISTING0 | grep "PREP_REAL_CASE ends correctly"
+  if [ $? -eq 0 ]; then
+    echo "`basename $EXE_REAL` PREP_REAL1.nam at forecast hour $curdate $curhour OK"
+    mv OUTPUT_LISTING0 OUTPUT_LISTING0_${curdate}-$curhour
+    echo `basename $EXE_REAL`" ${curdate}-$curhour OK"
+    rm -f file_for_xtransfer pipe_name
+  else
+    echo "ops in running `basename $EXE_REAL` PREP_REAL1.nam at forecast hour ${curdate}-$curhour"
+    exit 1;
+  fi
+done
+
+rm -fv fgfs.f*
+
+# Bye bye
+exit 0;
+

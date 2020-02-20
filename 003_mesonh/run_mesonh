@@ -1,0 +1,158 @@
+#! /bin/bash
+#set -x
+########################################################
+#
+# LZDIFFU=T (with CEN4TH), LZDIFFU=F (with WENO)
+#
+########################################################
+
+# Check env file
+envfile=../pie2500m.env
+if [ ! -e $envfile ]; then
+  echo "ops $envfile is missing!"
+  exit 1;
+else
+  source $envfile
+fi
+
+# Clear previous run
+./clean_mesonh
+
+# Link PGD FILES
+if [ -e ../001_pgd/${fpgd}.lfi ]; then
+  for ext in des lfi nc
+  do
+    ln -sf ../001_pgd/${fpgd}.${ext} .
+  done
+else
+  echo "ops ../001_pgd/${fpgd}.lfi is missing"
+  exit 1
+fi
+
+# Link real output files 
+for tstep in `seq $tstep_ini $tstep_inc $tstep_end`
+do
+  curdate=`date +%Y%m%d --date "$start_date $start_hour GMT + $tstep hour"`
+  curhour=`date +%H --date "$start_date $start_hour GMT + $tstep hour"`
+  FILEOUT=${PREFIX}_${RES}.t${curdate}z.f${curhour}00
+  echo $curdate $curhour
+  if [ -e ../002_real/${FILEOUT}.lfi ]; then
+    ln -svf ../002_real/${FILEOUT}.lfi .
+    ln -svf ../002_real/${FILEOUT}.des .
+  fi
+done
+
+inidate=`date +%Y%m%d --date "$start_date $start_hour GMT"`
+inihour=`date +%H --date "$start_date $start_hour GMT"`
+# Create EXSEG1.nam
+cat>EXSEG1.nam<<EOF
+&NAM_CONFIO LCDF4=F LLFIREAD=T LLFIOUT=T  /
+
+&NAM_LUNITn CINIFILE ='${PREFIX}_${RES}.t${inidate}z.f${inihour}00',
+            CINIFILEPGD = '${fpgd}',
+EOF
+count=1
+for tstep in `seq $tstep_inc $tstep_inc $((tstep_end-1))`
+do
+  curdate=`date +%Y%m%d --date "$start_date $start_hour GMT + $tstep hour"`
+  curhour=`date +%H --date "$start_date $start_hour GMT + $tstep hour"`
+  fbdy=${PREFIX}'_'${RES}'.t'${curdate}'z.f'${curhour}00
+cat>>EXSEG1.nam<<EOF
+       ,CCPLFILE($count) = '${fbdy}'
+EOF
+count=$((count+1))
+done
+  curdate=`date +%Y%m%d --date "$start_date $start_hour GMT + $tstep_end hour"`
+  curhour=`date +%H --date "$start_date $start_hour GMT + $tstep_end hour"`
+  fbdy=${PREFIX}'_'${RES}'.t'${curdate}'z.f'${curhour}00
+cat>>EXSEG1.nam<<EOF
+       ,CCPLFILE($count) = '${fbdy}' /
+
+&NAM_DYNn XTSTEP=${TIME_STEP}.,
+          CPRESOPT="ZRESI", 
+          NITR = 12,  LITRADJ=.TRUE., 
+          LVE_RELAX = .TRUE., 
+          LHORELAX_UVWTH=.TRUE., LHORELAX_RV=.TRUE., 
+          LHORELAX_RC=.T., LHORELAX_RR=.T., 
+          LHORELAX_RS=.T., LHORELAX_RI=.T., LHORELAX_RG=.T., 
+          NRIMX = 5, NRIMY = 5, 
+          XRIMKMAX = .001, XT4DIFU=1800. /
+&NAM_ADVn CUVW_ADV_SCHEME="CEN4TH",
+          CMET_ADV_SCHEME="PPM_01",
+          CTEMP_SCHEME='${NUM_SCHEME}' /
+&NAM_PARAM_MFSHALLn CMF_UPDRAFT='EDKF',
+                    CMF_CLOUD='DIRE',
+                    LMIXUV=T, LMF_FLX=F /
+&NAM_PARAMn CTURB="TKEL",
+            CRAD="ECMW",   
+            CCLOUD="$CLOUD",
+            CDCONV = "$CDCONV",
+            CSCONV = "$CSCONV" /
+&NAM_PARAM_RADn XDTRAD = 900., XDTRAD_CLONLY = 300., 
+                LCLEAR_SKY=.FALSE. /
+&NAM_ISBAn   /
+&NAM_LBCn  CLBCX = 2*"OPEN",
+           CLBCY = 2*"OPEN",
+           XCPHASE = 20. /
+&NAM_TURBn CTURBDIM="1DIM", 
+           CTURBLEN="BL89", 
+           LSUBG_COND=.T,
+           LTURB_DIAG=.F.,  
+           LTURB_FLX=.F., 
+           LSIGMAS=.T.,
+           LSIG_CONV = .F., 
+           CSUBG_AUCV='CLFR'  /
+&NAM_PARAM_ICE CSEDIM='SPLI' /
+&NAM_CH_MNHCn LUSECHEM = .FALSE. /
+&NAM_CONF  CCONF = "START", 
+           NVERB=5, 
+           NMODEL = ${NDOM},
+           CEXP = "$NAM_SIMU", 
+           CSEG = "$NAM_SEG",
+           NHALO=1  /
+&NAM_DYN XSEGLEN = $timeout_end, 
+         XASSELIN = 0.2, 
+         LCORIO = T , 
+         LNUMDIFU = T, 
+         LNUMDIFTH= F ,
+         XALKTOP = 0.003, 
+         XALZBOT = 11000. , 
+         LZDIFFU = F /
+!  The recommanded value is at least
+!  MPI_BUFFER_SIZE = 2 * (NX*NY*NZ * 8) / 1000000
+&NAM_CONFZ   MPI_BUFFER_SIZE = 500 /
+&NAM_NESTING   /
+&NAM_BACKUP XBAK_TIME_FREQ=${XBAK_TIME_FREQ}., 
+            XBAK_TIME_FREQ_FIRST=${XBAK_TIME_FREQ_FIRST}. / 
+&NAM_SGH_ISBAn /
+&NAM_DIAG_SURFn N2M=2,
+                 LSURF_BUDGET=T /
+EOF
+#!  When CCLOUD=C2R2
+#!  &NAM_PARAM_C2R2 HPARAM_CCN="TWO", HINI_CCN="CCN" /
+
+cp EXSEG1.nam SURF1.nam
+#
+rm -f $MY_HOSTFILE
+echo 'node21.lamma.it' > $MY_HOSTFILE
+for node in $host_list
+do
+  echo $node >> $MY_HOSTFILE
+  scp -rp $DOMAIN_DIR/003_mesonh/EXSEG1.nam $node:$DOMAIN_DIR/003_mesonh/
+  scp -rp $DOMAIN_DIR/003_mesonh/SURF1.nam $node:$DOMAIN_DIR/003_mesonh/
+  scp -rp $MY_HOSTFILE $node:$DOMAIN_DIR/003_mesonh/`basename ${MY_HOSTFILE}`
+  scp -rp ${EXE_RUN} $node:$DOMAIN_DIR/003_mesonh/`basename ${EXE_RUN}`
+done
+
+time mpirun -np $NUM_PROC --hostfile $MY_HOSTFILE ${EXE_RUN} > ${NAM_SIMU}_${NAM_SEG}.out
+if [ $? -eq 0 ]; then
+  echo "`basename $EXE_RUN` EXSEG1.nam SURF1.nam OK"
+  rm -fv ${NAM_SIMU}_${NAM_SEG}.out
+else
+  echo "ops in running `basename $EXE_RUN` EXSEG1.nam SURF1.nam"
+  exit 1
+fi
+
+#######################################################
+exit 0
+

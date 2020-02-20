@@ -1,0 +1,56 @@
+#! /bin/bash
+
+# Check env file
+envfile=../pie2500m.env
+if [ ! -e $envfile ]; then
+  echo "ops $envfile is missing!"
+  exit 1;
+else
+  source $envfile
+fi
+
+# Clear previous diagnostic _dg files
+for DOM in `seq 1 $NDOM`
+do
+  rm -f d.*.{lfi,des}
+  rm -f ./${NAM_SIMU}.${DOM}.${NAM_SEG}.*_dg.{lfi,des}
+done
+
+# Link diagnostic _dg files
+for DOM in `seq 1 $NDOM`
+do
+  for ext in lfi des
+  do
+    ln -svf ../004_diag/${NAM_SIMU}.${DOM}.${NAM_SEG}.*_dg.${ext} .
+  done
+done
+
+# Run conv2dia diagnostic files
+for DOM in `seq 1 $NDOM`
+do
+  for ggg in `ls ./${NAM_SIMU}.${DOM}.${NAM_SEG}.*_dg.lfi | grep -v "000"`
+  do
+    fff=`basename ${ggg} .lfi`
+    echo conv2dia $fff
+cat << EOF > conv2dia.file
+1
+${fff}
+d.${fff}
+n
+n
+0
+EOF
+    conv2dia < conv2dia.file >& /dev/null
+    if [ $? -ne 0 ]; then
+      echo "conv2dia ${fff} KO"; exit 1;
+    else
+      echo conv2dia OK
+      rm -f conv2dia.file dirconv
+      rm -f ${fff}.lfi ${fff}.des
+    fi
+  done
+done
+
+rm -f FICJD OUT_DIA LISTING_DIA
+exit 0
+

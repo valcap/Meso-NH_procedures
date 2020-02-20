@@ -1,0 +1,65 @@
+#!/bin/bash
+
+# Check env file
+envfile=../pie2500m.env
+if [ ! -e $envfile ]; then
+  echo "ops $envfile is missing!"
+  exit 1;
+else
+  source $envfile
+fi
+
+# Clear precedent runs
+./clean_prep_pgd
+
+# Link static files
+echo "RUNNING LINK..."
+for fff in CLAY_HWSD_MOY ECOCLIMAP_II_EUROP_V2.3 gtopo30 SAND_HWSD_MOY srtm_ne_250
+do
+  rm -f ${fff}.*
+  for ext in hdr dir
+  do
+    ln -sf ${STATIC_DIR}/${fff}.${ext} .
+    if [ $? -ne 0 ]; then
+      echo "ops problem in linking ${STATIC_DIR}/${fff}.${ext} here"
+      echo "LINK KO"
+      exit 1
+    fi
+  done
+done
+echo "RUNNING LINK OK"
+
+# Domain 2.5 km
+PGD_NAM_FILE=PRE_PGD1.nam_2.5km
+if [ ! -e $PGD_NAM_FILE ]; then
+  echo "ops $PGD_NAM_FILE is missing!"
+  exit 1;
+else
+   cp $PGD_NAM_FILE PRE_PGD1.nam
+fi
+echo "RUNNING `basename $EXE_PGD` $PGD_NAM_FILE"
+time mpirun -np 1 ${EXE_PGD} >& /dev/null 2>&1
+#time mpirun -np 1 ${EXE_PGD} 
+if [ $? -eq 0 ]; then
+  mv OUTPUT_LISTING0 OUTPUT_LISTING0_pgd
+  rm -f pipe_name file_for_xtransfer
+  cat OUTPUT_LISTING0_pgd | grep "PREP_PGD ends correctly"
+  if [ $? -eq 0 ]; then
+    echo "RUNNING `basename $EXE_PGD` $PGD_NAM_FILE OK"
+    #rm -f OUTPUT_LISTING0_pgd
+  else
+    echo "ops generic error in ${EXE_PGD}"
+    echo "see OUTPUT_LISTING0_pgd"
+    exit 1
+  fi
+else
+  echo "ops something went wrong"
+  echo "error code is $?"
+  exit 1
+fi
+
+##############
+# Bye bye
+exit 0
+##############
+

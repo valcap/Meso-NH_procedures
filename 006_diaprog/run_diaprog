@@ -1,0 +1,83 @@
+#! /bin/bash
+
+# Check env file
+envfile=../pie2500m.env
+if [ ! -e $envfile ]; then
+  echo "ops $envfile is missing!"
+  exit 1;
+else
+  source $envfile
+fi
+
+# Clear previous run
+rm -f ./*.png ./*.eps ./*.ps
+
+# Link diagnostic _dg files
+for DOM in `seq 1 $NDOM`; do
+  for ext in lfi des; do
+    for diag_file in `ls ../005_conv2dia/d.${NAM_SIMU}.${DOM}.${NAM_SEG}.*_dg.${ext}`; do
+      ln -svf $diag_file .
+    done
+  done
+done
+
+###################
+# REMOVE
+#exit 1
+###################
+
+# Run diaprog diagnostic files
+for DOM in `seq 1 $NDOM`
+do
+  for ggg in `ls ./d.${NAM_SIMU}.${DOM}.${NAM_SEG}.*_dg.lfi | grep -v "000"`
+  do
+    basefile_dg=`basename $ggg .lfi`
+    prog=`echo $basefile_dg | cut -c 17-19`
+    echo "diaprog $basefile_dg"
+    if [ ! -e ../util/$GUST10m_TMPL ]; then
+      echo "ops ../util/$GUST10m_TMPL is missing"; exit 1
+    else
+      cp ../util/$GUST10m_TMPL .
+    fi
+    cat $GUST10m_TMPL | sed -e "s!INFILE!${basefile_dg}!" > tmp.diaprog
+    diaprog < tmp.diaprog > /dev/null
+    if [ $? -ne 0 ]; then
+      echo "$GUST10m_TMPL ${basefile_dg} KO"; exit 1;
+    else
+      echo $GUST10m_TMPL $basefile_dg OK
+      ctrans -d ps.color gmeta > gust10m_${DOM}_${CLOUD}_${prog}.ps
+      convert gust10m_${DOM}_${CLOUD}_${prog}.ps gust10m_${DOM}_${CLOUD}_${prog}.png
+      mv gust10m_${DOM}_${CLOUD}_${prog}-0.png gust10m_${DOM}_${CLOUD}_${prog}.png
+      rm -f gust10m_${DOM}_${CLOUD}_${prog}-1.png
+      rm -f gust10m_${DOM}_${CLOUD}_${prog}.ps
+      rm -f tmp.diaprog
+    fi
+    if [ ! -e ../util/$RAINSFC_TMPL ]; then
+      echo "ops ../util/$RAINSFC_TMPL is missing"; exit 1
+    else
+      cp ../util/$RAINSFC_TMPL .
+    fi
+    cat $RAINSFC_TMPL | sed -e "s!INFILE!${basefile_dg}!" > tmp.diaprog
+    diaprog < tmp.diaprog > /dev/null
+    if [ $? -ne 0 ]; then
+      echo "$GUST10m_TMPL ${basefile_dg} KO"; exit 1;
+    else
+      echo $GUST10m_TMPL ${basefile_dg} OK
+      ctrans -d ps.color gmeta > rain_${DOM}_${CLOUD}_${prog}.ps
+      convert rain_${DOM}_${CLOUD}_${prog}.ps rain_${DOM}_${CLOUD}_${prog}.png
+      mv rain_${DOM}_${CLOUD}_${prog}-0.png rain_${DOM}_${CLOUD}_${prog}.png
+      rm -f rain_${DOM}_${CLOUD}_${prog}-1.png
+      rm -f rain_${DOM}_${CLOUD}_${prog}.ps
+      rm -f tmp.diaprog OUT_DIA dir.* gmeta 
+    fi
+    for ext in lfi des
+    do
+      rm -f d.${NAM_SIMU}.${DOM}.${NAM_SEG}.${prog}_dg.${ext}
+    done
+  done
+done
+
+rm -f tmp.diaprog dir.* OUT_DIA gmeta
+
+exit 0;
+

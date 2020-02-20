@@ -1,0 +1,14 @@
+#!/bin/bash
+
+# Check env file
+envfile=../pie2500m.env
+if [ ! -e $envfile ]; then
+  echo "ops $envfile is missing!"
+  exit 1;
+else
+  source $envfile
+fi
+
+rm -fv tmp.diaprog OUT_DIA gmeta dir.*\:*\:*
+rm -fv wind10m_*_${CLOUD}*.ps rain_*_${CLOUD}_*.ps
+rm -fv gust10m_*_${CLOUD}*_*.png rain_*_${CLOUD}*_*.png

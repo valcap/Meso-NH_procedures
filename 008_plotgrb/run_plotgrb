@@ -1,0 +1,318 @@
+#! /bin/bash
+
+# Check env file
+envfile=../pie2500m.env
+if [ ! -e $envfile ]; then
+  echo "ops $envfile is missing!"
+  exit 1;
+else
+  source $envfile
+fi
+
+# clean previous run
+#./clean_plotgrb
+for var in tmp2m wnd10m acprr
+do
+  rm -f d.${NAM_SIMU}.*.${NAM_SEG}.*_${var}.png
+done
+
+# Link diagnostic grb files
+echo "Linking grib files"
+for DOM in `seq 1 $NDOM`; do
+  for var in wnd10m tmp2m acprr
+  do 
+    for grib_file in `ls ../007_dia2grb/d.${NAM_SIMU}.${DOM}.${NAM_SEG}.*_${var}.grb`
+    do
+      ln -sf $grib_file `basename $grib_file`
+    done
+  done
+done
+
+# Get initial time step
+for DOM in `seq 1 $NDOM`; do
+  for var in wnd10m tmp2m acprr
+  do
+    ini_grib_file=d.${NAM_SIMU}.${DOM}.${NAM_SEG}.001_${var}.grb
+    if [ -e $ini_grib_file ]; then
+      grib2ctl -verf $ini_grib_file > temp.ctl
+      ini_tstep=`cat temp.ctl | grep tdef | cut -d' ' -f 4`
+      # 15Z01aug2015
+      hh_ini=`echo $ini_tstep | cut -c1-2`
+      dd_ini=`echo $ini_tstep | cut -c4-5`
+      mm_ini=`echo $ini_tstep | cut -c6-8`
+      yy_ini=`echo $ini_tstep | cut -c9-12`
+      break
+    fi
+  done
+done
+rm -f temp.ctl
+
+# Create ctl file
+echo "Creating ctl and idx files"
+for DOM in `seq 1 $NDOM`; do
+  for var in wnd10m tmp2m acprr
+  do
+    ini_grib_file=d.${NAM_SIMU}.${DOM}.${NAM_SEG}.001_${var}.grb
+    grib2ctl -verf $ini_grib_file > temp.ctl
+    prog=0
+    for grib_file in `ls d.${NAM_SIMU}.${DOM}.${NAM_SEG}.*_${var}.grb`
+    do
+      dset='dset ^'$grib_file
+      index='index ^'$grib_file'.idx'
+      undef=`cat temp.ctl | grep undef`
+      title='title '$grib_file
+      dtype=`cat temp.ctl | grep dtype`
+      options='options yrev'
+      ydef=`cat temp.ctl | grep ydef`
+      xdef=`cat temp.ctl | grep xdef`
+      tdef='tdef 1 linear '`date +%H:%MZ%d%b%Y --date "$dd_ini-$mm_ini-$yy_ini $hh_ini UTC + $prog seconds"`' 1mo'
+      zdef=`cat temp.ctl | grep zdef`
+      vars=`cat temp.ctl | grep vars`
+      ENDVARS=`cat temp.ctl | grep ENDVARS`
+      prog=$((prog + XBAK_TIME_FREQ))
+# Now create the ctl file
+      echo $dset > ${grib_file}.ctl
+      echo $index >> ${grib_file}.ctl 
+      echo $undef >> ${grib_file}.ctl
+      echo $title >> ${grib_file}.ctl
+      echo $dtype >> ${grib_file}.ctl
+      echo $options >> ${grib_file}.ctl
+      echo $ydef >> ${grib_file}.ctl
+      echo $xdef >> ${grib_file}.ctl
+      echo $tdef >> ${grib_file}.ctl
+      echo $zdef >> ${grib_file}.ctl
+      echo $vars >> ${grib_file}.ctl
+      case  $var in
+            tmp2m)
+            echo 'TMP2m 0 11,105,2 2 m above ground Temp. [K]' >> ${grib_file}.ctl
+                  ;;
+            acprr)
+            echo 'APCP0m  0 61,105,0 0 m above ground Total precipitation [kg/m^2]' >> ${grib_file}.ctl
+                  ;;
+            wnd10m)
+            echo 'GUST10m  0 180,105,10 10 m above ground Surface wind gust [m/s]' >> ${grib_file}.ctl
+            echo 'UGRD10m  0 33,105,10 10 m above ground u wind [m/s]' >> ${grib_file}.ctl
+            echo 'VGRD10m  0 34,105,10 10 m above ground v wind [m/s]' >> ${grib_file}.ctl
+                  ;;
+            *)
+                exit 1
+      esac
+      echo $ENDVARS >> ${grib_file}.ctl
+      gribmap -i ${grib_file}.ctl >& /dev/null
+    done
+    rm -f temp.ctl
+  done
+done
+
+# create gs file for tmp2m
+for DOM in `seq 1 $NDOM`
+do
+echo "Running GrADS for TMP 2m"
+  for ctl_file in `ls d.${NAM_SIMU}.${DOM}.${NAM_SEG}.*_tmp2m.grb.ctl`
+  do
+  png_file=`basename $ctl_file .grb.ctl`.png
+  time_is=`cat $ctl_file | grep tdef | cut -d' ' -f4`
+cat << EOF > temp.tmp2m.gs
+'reinit'
+'open $ctl_file'
+'set grads off'
+'set grid off'
+'set lat $minlat $maxlat'
+'set lon $minlon $maxlon'
+'set gxout shaded'
+'set mpdset hires'
+'set poli off'
+'run ../util/colori_t2m.gs'
+'d TMP2m-273'
+'run cbarn'
+* draw strings
+*'set string 1 bl'
+'draw string $xini_tit $yini_tit Init: ${hh_ini}Z${dd_ini}${mm_ini}${yy_ini}'
+'draw string $xval_tit $yval_tit Valid: $time_is'
+'draw string $xmp_tit $ymp_tit MP is $CLOUD'
+'draw string $xvar_tit $yvar_tit Temperature @ 2m [C]'
+* Florence mark
+'set line 1'
+slon = 8.5051; slat = 45.1340
+'q w2xy 'slon' 'slat
+xp = subwrd(result,3)
+yp = subwrd(result,6)
+'draw mark 1 'xp' 'yp' 0.15'
+'draw line 'xp' 'yp' 'xp-0.38' 'yp+0.3
+'set string 1 c 2 0'
+'set strsiz 0.1'
+'draw string 'xp-0.40' 'yp+0.4' Casale Monf.'
+'close 1'
+'printim $png_file white png'
+'quit'
+EOF
+  grads -blc temp.tmp2m.gs >& /dev/null
+  rm -f temp.tmp2m.gs
+  done
+done
+
+# create gs file for acprr
+for DOM in `seq 1 $NDOM`
+do
+echo "Running GrADS for Precipitation"
+  for ctl_file in `ls d.${NAM_SIMU}.${DOM}.${NAM_SEG}.*_acprr.grb.ctl`
+  do
+  png_file=`basename $ctl_file .grb.ctl`.png
+  time_is=`cat $ctl_file | grep tdef | cut -d' ' -f4`
+cat << EOF > temp.acprr.gs
+'reinit'
+'open $ctl_file'
+'set grads off'
+'set grid off'
+'set lat $minlat $maxlat'
+'set lon $minlon $maxlon'
+'set gxout shaded'
+*'set mpdset hires'
+*'set poli off'
+'set mpt * off'
+'run ../util/colori_pcp_new.gs'
+'d APCP0m'
+'run cbarn'
+'set line 1 1 6'
+'draw shp /home/mnh/DATA/SHP/PIE.shp'
+'set line 0 1 4'
+'draw shp /home/mnh/DATA/SHP/waterways_PIE.shp'
+'set line 1 1 4'
+'draw shp /home/mnh/DATA/SHP/ITA_adm0.shp'
+'set line 1 1 4'
+'draw shp /home/mnh/DATA/SHP/FRA_adm0.shp'
+* draw strings
+*'set string 1 bl'
+'draw string $xini_tit $yini_tit Init: ${hh_ini}Z${dd_ini}${mm_ini}${yy_ini}'
+'draw string $xval_tit $yval_tit Valid: $time_is'
+'draw string $xmp_tit $ymp_tit MP is $CLOUD'
+'draw string $xvar_tit $yvar_tit Total precipitation [mm]'
+* Florence mark
+'set line 1'
+slon = 8.5051; slat = 45.1340
+'q w2xy 'slon' 'slat
+xp = subwrd(result,3)
+yp = subwrd(result,6)
+'draw mark 1 'xp' 'yp' 0.15'
+'draw line 'xp' 'yp' 'xp-0.38' 'yp+0.3
+'set string 1 c 2 0'
+'set strsiz 0.1'
+'draw string 'xp-0.40' 'yp+0.4' Casale Monf.'
+'close 1'
+'printim $png_file white png'
+'quit'
+EOF
+  grads -blc temp.acprr.gs >& /dev/null
+  rm -f temp.acprr.gs
+  done
+done
+########################################################
+# create gs file for wnd10m
+for DOM in `seq 1 $NDOM`
+do
+echo "Running GrADS for wind @ 10m"
+  for ctl_file in `ls d.${NAM_SIMU}.${DOM}.${NAM_SEG}.*_wnd10m.grb.ctl`
+  do
+  png_file1=`basename $ctl_file wnd10m.grb.ctl`wnd10m.png
+  png_file2=`basename $ctl_file wnd10m.grb.ctl`gust.png
+  time_is=`cat $ctl_file | grep tdef | cut -d' ' -f4`
+cat << EOF > temp.wnd10m.gs
+'reinit'
+'open $ctl_file'
+'set grads off'
+'set grid off'
+'set lat $minlat $maxlat'
+'set lon $minlon $maxlon'
+'set gxout shaded'
+'set mpdset hires'
+'set poli off'
+'run ../util/BEAUFORT2.gs'
+'define ux=UGRD10m*3.6'
+'define vy=VGRD10m*3.6'
+'define spd = mag(ux,vy)'
+'define spdm = maskout(spd,spd-5)'
+'define ujet=maskout(ux,spdm)'
+'define vjet=maskout(vy,spdm)'
+'d spd'
+'run ../util/cbarn_beaufort_ita.gs'
+'set gxout vector'
+'set arrscl 0.12'
+*'set ccolor 15'
+'set cthick 1'
+'d skip(ujet,3,3);vjet'
+* draw strings
+*'set string 1 bl'
+'draw string $xini_tit $yini_tit Init: ${hh_ini}Z${dd_ini}${mm_ini}${yy_ini}' 
+'draw string $xval_tit $yval_tit Valid: $time_is'
+'draw string $xmp_tit $ymp_tit MP is $CLOUD'
+'draw string $xvar_tit $yvar_tit Wind @ 10m [m/s]'
+* Florence mark
+'set line 1'
+slon = 8.5051; slat = 45.1340
+'q w2xy 'slon' 'slat
+xp = subwrd(result,3)
+yp = subwrd(result,6)
+'draw mark 1 'xp' 'yp' 0.15'
+'draw line 'xp' 'yp' 'xp-0.38' 'yp+0.3
+'set string 1 c 2 0'
+'set strsiz 0.1'
+'draw string 'xp-0.40' 'yp+0.4' Casale Monf.'
+'close 1'
+'printim $png_file1 white png'
+*
+'reinit'
+'open $ctl_file'
+'set grads off'
+'set grid off'
+'set lat $minlat $maxlat'
+'set lon $minlon $maxlon'
+'set gxout shaded'
+'set mpdset hires'
+'set poli off'
+'run ../util/BEAUFORT3.gs'
+'d GUST10m*3.6'
+'run ../util/cbarn_beaufort_ita.gs'
+'set gxout vector'
+'define ukm = UGRD10m*3.6'
+'define vkm = VGRD10m*3.6'
+tresh=20
+'define spd = mag(ukm,vkm)'
+'define spdm = maskout(spd,spd-'tresh')'
+'define ujet=maskout(ukm,spdm)'
+'define vjet=maskout(vkm,spdm)'
+'set arrscl 0.12'
+'d skip(ujet,3,3);vjet'
+* draw strings
+*'set string 1 bl'
+'draw string $xini_tit $yini_tit Init: ${hh_ini}Z${dd_ini}${mm_ini}${yy_ini}'
+'draw string $xval_tit $yval_tit Valid: $time_is'
+'draw string $xmp_tit $ymp_tit MP is $CLOUD'
+'draw string $xvar_tit $yvar_tit Wind gust @ 10m [m/s]'
+* Florence mark
+'set line 1'
+slon = 11.2868; slat = 43.7664
+'q w2xy 'slon' 'slat
+xp = subwrd(result,3)
+yp = subwrd(result,6)
+'draw mark 1 'xp' 'yp' 0.15'
+'draw line 'xp' 'yp' 'xp-0.38' 'yp+0.3
+'set string 1 c 2 0'
+'set strsiz 0.1'
+'draw string 'xp-0.40' 'yp+0.4' Fi'
+'close 1'
+'printim $png_file2 white png'
+
+'quit'
+EOF
+  grads -blc temp.wnd10m.gs >& /dev/null
+  rm -f temp.wnd10m.gs
+  done
+done
+
+
+
+# clean previous run
+#./clean_plotgrb
+
+exit 0;
+
